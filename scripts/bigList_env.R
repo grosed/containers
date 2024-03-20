@@ -3,15 +3,15 @@ library(tictoc)
 
 ## this is a niave implimentation that doesn't pop properly
 bigList <- function(block_size=5){
-    list(
-        rec = list(rep(list(NULL),block_size)),
-        cnt = 0,
-        bk = block_size,
-        frst = 1,
-        lst = 1
-    )
+    e <- new.env(hash=FALSE)
+    e$rec = list(rep(list(NULL),block_size))
+    e$cnt = 0
+    e$bk = block_size
+    e$frst = 1
+    e$lst = 1
+    e
 }
-# push back
+## push back
 push_back = function(bl,x){
     ## location within final block
     if(bl$lst == 1){
@@ -29,7 +29,7 @@ push_back = function(bl,x){
     }
     bl$rec[[ bl$lst ]][[ii]] <- x
     bl$cnt[bl$lst] <- bl$cnt[bl$lst]+1
-    invisible(bl)
+    bl
 }
 ## pop back
 pop_back = function(bl){
@@ -41,30 +41,9 @@ pop_back = function(bl){
     out <- bl$rec[[ bl$lst ]][[ii]]
     bl$cnt[ bl$lst:length(bl$cnt) ] <- bl$cnt[  bl$lst:length(bl$cnt) ]-1
     bl$rec[[ bl$lst ]][[ii]] <- list(NULL)
-    if(ii == 1){ bl$lst <- bl$lst - 1 }
+    if(ii == 1 & bl$lst>1){ bl$lst <- bl$lst - 1 }
     out
 }
-## doing pop back as two steps
-get_last <- function(bl){
-    if(bl$lst == 1){
-        ii <- bl$cnt[ bl$lst ]
-    }else{
-        ii <- bl$cnt[ bl$lst ] - bl$cnt[ bl$lst -1 ]
-    }
-    bl$rec[[ bl$lst ]][[ii]]
-}
-drop_last <- function(bl){
-    if(bl$lst == 1){
-        ii <- bl$cnt[ bl$lst ]
-    }else{
-        ii <- bl$cnt[ bl$lst ] - bl$cnt[ bl$lst -1 ]
-    }
-    bl$cnt[bl$lst] <- bl$cnt[bl$lst]-1
-    bl$rec[[ bl$lst ]][[ii]] <- list(NULL)
-    if(ii == 1){ bl$lst <- bl$lst - 1 }
-    bl
-}   
-
 ##
 push_front = function(bl,x){
     ## number of places filled in the first element
@@ -89,7 +68,6 @@ pop_front = function(bl){
     out <- bl$rec[[ bl$frst ]][[1]]
     bl$rec[[ bl$frst ]] <- c( bl$rec[[bl$frst]][-1], list(NULL) )
     bl$cnt[ bl$frst:length(bl$cnt) ] <- bl$cnt[ bl$frst:length(bl$cnt) ] - 1
-##    bl$rec[[ bl$frst ]][[ii]] <- list(NULL)
     if(bl$frst == 1){
         jj <- bl$cnt[ bl$frst ]
     }else{
@@ -98,25 +76,6 @@ pop_front = function(bl){
     if( jj == 0 ){ bl$frst <- bl$frst + 1 }
     out
 }
-get_front = function(bl){
-    bl$rec[[ bl$frst ]][[1]]
-}
-drop_front = function(bl){
-    bl$rec[[ bl$frst ]] <- c( bl$rec[[bl$frst]][-1], list(NULL) )
-    bl$cnt[ bl$frst:length(bl$cnt) ] <- bl$cnt[ bl$frst:length(bl$cnt) ] - 1
-    if(bl$frst == 1){
-        jj <- bl$cnt[ bl$frst ]
-    }else{
-        jj <- bl$cnt[ bl$frst ] - bl$cnt[ bl$frst -1 ]
-    }
-    if( jj == 0 ){ bl$frst <- bl$frst + 1 }
-    bl
-}
-
-
-
-
-
 
 
 
@@ -130,7 +89,7 @@ tmp <- bigList(100)
 for(ii in 1:n){
     tmp <- push_front(tmp,ii)
 }
-toc() ## ~19.2s / 100k
+toc() ## ~19.5s / 100k
 
 tic()
 tmp <- list()
@@ -141,7 +100,7 @@ for(ii in 1:n){
     ##tmp[2:(length(tmp)+1)] <- tmp
     ##tmp[[1]] <- ii
 }
-toc() ## ~26s /100k
+toc() ## ~25s / 100k
 
 
 ## ############################
@@ -155,7 +114,7 @@ tmp <- bigList(100)
 for(ii in 1:n){
     tmp <- push_back(tmp,ii)
 }
-toc() ## 0.48 s / 100k
+toc() ## 0.433s / 100k
 
 ## basic R list growth
 tic()
@@ -163,7 +122,7 @@ tmp <- list()
 for(ii in 1:n){
     tmp[[ii]] <- ii
 }
-toc() ## 0.04s / 100k
+toc() ## 0.04s /100k
 
 ## ############################
 ## pop from back
@@ -176,23 +135,22 @@ for(ii in 1:n){
     tmp <- push_back(tmp,ii)
 }
 
-## wrong since no changes to tmp
 tic()
 out <- rep(NA,n)
 for(ii in 1:n){
     out[ii] <- pop_back(tmp)
 }
-toc() # ~0.7s / 100k
+toc() # 1s / 100k
 
-## As two functions
+## in base R
 tic()
-ttmp <- tmp
+tmp <- as.list(1:n)
 out <- rep(NA,n)
 for(ii in 1:n){
-    out[ii] <- get_last(ttmp)
-    ttmp <- drop_last(ttmp)
+    out[ii] <- tmp[length(tmp)]
+    tmp <- head(tmp,-1)
 }
-toc() ## ~0.76 / 100k
+toc() ## 28s / 100k
 
 ## #################################
 ## pop from front
@@ -204,23 +162,12 @@ for(ii in 1:n){
     tmp <- push_back(tmp,ii)
 }
 
-## wrong since no changes to tmp
 tic()
 out <- rep(NA,n)
 for(ii in 1:n){
     out[ii] <- pop_front(tmp)
 }
-toc() ## ~1.4s / 100k
-
-## As two functions
-tic()
-ttmp <- tmp
-out <- rep(NA,n)
-for(ii in 1:n){
-    out[ii] <- get_front(ttmp)
-    ttmp <- drop_front(ttmp)
-}
-toc() ## ~1.2s / 100k
+toc() # ~1.4s / 100k
 
 ## As two calls in base R - slower
 tic()
@@ -230,14 +177,16 @@ for(ii in 1:n){
     out[ii] <- ttmp[1]
     ttmp <- ttmp[-1]
 }
-toc() ## ~30s / 100k
+toc() ## 30s / 100k
 
 
 
 
 ## ##############################################
 ## Some basic list tests in R
-n <- 100000
+n <- 1000000
+library(tictoc)
 tic(); tmp <- as.list(1:n); toc()
 tic(); tmp <- list(); for(ii in 1:n){tmp[[ii]] <- ii}; toc()
 tic(); tmp <- rep(list(NULL),n); for(ii in 1:n){tmp[[ii]] <- ii}; toc()
+
